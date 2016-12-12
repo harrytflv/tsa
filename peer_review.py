@@ -122,7 +122,7 @@ class PeerReviewAnalyzer(object):
     plt.savefig(f_name)
     plt.close(fig)
 
-  def consistency_more_grade(self, filtered=False, divide_by_iterations=True):
+  def consistency_more_grade(self, filtered=False, divide_by_iterations=True, plot=True):
     if divide_by_iterations:
       grading, scores, students = [], [], []
       for ite in range(4):
@@ -168,6 +168,23 @@ class PeerReviewAnalyzer(object):
     f_name = 'results/grading_unfair.png' if not filtered else 'results/grading_unfair_filtered.png'
     plt.savefig(f_name)
     plt.close(fig)
+
+  def avg_grade(self):
+    libStu2Grade= defaultdict(lambda: [])
+    for item in self.dataset:
+      for i in [1,2,3,4,5,6]:
+        grade = item['Rating for Person {}:'.format(i)]
+        stu_key = 'What is your name? (Person 1)'.format(i) if i == 1 else 'Person {}:'.format(i)
+        if grade:
+          libStu2Grade[item[stu_key]].append(int(grade))
+    return {k: np.average(v) for k, v in libStu2Grade.items()}
+
+  def avg_score(self, filtered=False):
+    _, grading, scores, students = self.sentiment_analysis(self.dataset, filtered)
+    libStu2Score = defaultdict(lambda: [])
+    for ite, stu in enumerate(students):
+      libStu2Score[stu].append(scores[ite])
+    return {k: np.average(v) for k, v in libStu2Score.items()}
 
 def main():
   # dataset = PeerReview('data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')

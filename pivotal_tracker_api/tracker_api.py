@@ -20,6 +20,14 @@ class TrackerApi:
 		url = self._resource('projects/{}/stories'.format(project_id))
 		return self._request(url)
 
+	def get_account(self, account_id):
+		url = self._resource('accounts/{}'.format(account_id))
+		return self._request(url)
+
+	def get_story_owners(self, project_id, story_id):
+		url = self._resource('projects/{project_id}/stories/{story_id}/owners'.format(project_id=project_id, story_id=story_id))
+		return self._request(url)
+
 	def _add_headers(self, req, params = {}):
 		req.add_header('Content-Type', 'application/json')
 		req.add_header('X-TrackerToken', self.token)
@@ -42,6 +50,7 @@ def main():
 	# print(client.get_proejct('934278'))
 	# print(client.get_story_transitions('934278', '60145984'))
 	print(client.get_stories('934278'))
+	print(client.get_story_owners('934278', '60145984'))
 
 if __name__ == '__main__':
 	main()

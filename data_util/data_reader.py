@@ -40,6 +40,14 @@ class PeerReview(Dataset):
     else:
       print('Input data name not valid.')
 
+  def students(self):
+    set_students = set()
+    for item in self:
+      for i in [1,2,3,4]:
+        key = 'What is your name? (Person 1)'.format(i) if i == 1 else 'Person {}:'.format(i)
+        set_students.add(item[key])
+    return set_students
+
 class ProjectInfo(Dataset):
   def _preload(self):
     with open(self.data_file, 'r') as f_in:

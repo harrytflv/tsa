@@ -2,3 +2,4 @@ data
 conf
 *.pyc
 results
+cache

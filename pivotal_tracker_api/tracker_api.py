@@ -1,3 +1,5 @@
+#!/usr/bin/env 
+
 import urllib.request
 import json
 
@@ -30,6 +32,16 @@ class TrackerApi:
 		resp = urllib.request.urlopen(req)
 		return json.loads(resp.read().decode('utf-8'))
 
-
 	def _resource(self, resource):
 		return self.API_BASE + resource
+
+def main():
+	with open('../conf/tokens.json', 'r') as f_in:
+		tokens = json.load(f_in)
+	client = TrackerApi(tokens['pivotal_tracker']['token'])
+	# print(client.get_proejct('934278'))
+	# print(client.get_story_transitions('934278', '60145984'))
+	print(client.get_stories('934278'))
+
+if __name__ == '__main__':
+	main()

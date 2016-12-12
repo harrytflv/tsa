@@ -10,7 +10,9 @@ from collections import defaultdict
 from data_util.data_reader import PeerReview
 
 class PeerReviewAnalyzer(object):
+  '''Used for analyzing peer reviews'''
   def __init__(self, dataset):
+    super(PeerReviewAnalyzer, self).__init__()
     self.dataset = dataset
 
   def token_freq(self):
@@ -100,7 +102,7 @@ class PeerReviewAnalyzer(object):
     lstStdScore, lstAvgScore = [], []
     for s in set(students):
       lstStdGrade.append(np.std(libStu2Grade[s]))
-      lstAvgScore.append(np.average(libStu2Grade[s]))
+      lstAvgGrade.append(np.average(libStu2Grade[s]))
       lstStdScore.append(np.std(libStu2Score[s]))
       lstAvgScore.append(np.average(libStu2Score[s]))
 
@@ -109,6 +111,14 @@ class PeerReviewAnalyzer(object):
     sns.distplot(lstStdScore, label='score')
     plt.legend()
     f_name = 'results/consistency.png' if not filtered else 'results/consistency_filtered.png'
+    plt.savefig(f_name)
+    plt.close(fig)
+
+    fig, ax = plt.subplots()
+    sns.distplot(lstAvgGrade, label='grade')
+    sns.distplot(lstAvgScore, label='score')
+    plt.legend()
+    f_name = 'results/grading.png' if not filtered else 'results/grading_filtered.png'
     plt.savefig(f_name)
     plt.close(fig)
 
@@ -133,13 +143,13 @@ class PeerReviewAnalyzer(object):
           grade = item['Rating for Person {}:'.format(i)]
           stu_key = 'What is your name? (Person 1)'.format(i) if i == 1 else 'Person {}:'.format(i)
           if grade:
-            libStu2Grade[item[stu_key]+str(ite)].append(int(grade))
+            libStu2Grade[item[stu_key]+str(ite)].append((int(grade)-1.0)/4.0)
 
     lstStdGrade, lstAvgGrade = [], []
     lstStdScore, lstAvgScore = [], []
     for s in set(students):
       lstStdGrade.append(np.std(libStu2Grade[s]))
-      lstAvgScore.append(np.average(libStu2Grade[s]))
+      lstAvgGrade.append(np.average(libStu2Grade[s]))
       lstStdScore.append(np.std(libStu2Score[s]))
       lstAvgScore.append(np.average(libStu2Score[s]))
 
@@ -148,6 +158,14 @@ class PeerReviewAnalyzer(object):
     sns.distplot(lstStdScore, label='score')
     plt.legend()
     f_name = 'results/consistency_unfair.png' if not filtered else 'results/consistency_unfair_filtered.png'
+    plt.savefig(f_name)
+    plt.close(fig)
+
+    fig, ax = plt.subplots()
+    sns.distplot(lstAvgGrade, label='grade')
+    sns.distplot(lstAvgScore, label='score')
+    plt.legend()
+    f_name = 'results/grading_unfair.png' if not filtered else 'results/grading_unfair_filtered.png'
     plt.savefig(f_name)
     plt.close(fig)
 

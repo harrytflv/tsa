@@ -45,7 +45,16 @@ class ProjectInfo(Dataset):
     with open(self.data_file, 'r') as f_in:
       csv_reader = csv.DictReader(f_in)
       for row in csv_reader:
-        self.append(row)
+        self.append({
+          'semester': row['w'],
+          'ID': row['Team#'],
+          'project': row['Project'],
+          'deployment': row['Deployment'],
+          'repo': row['Repo'],
+          'code_climate': row['CodeClimate'],
+          'tracker': row['Tracker'].split('/')[-1],
+          'students': [item.strip() for item in row['Students'].split(',')]
+        })
 
 def main():
   dataset = PeerReview('../data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')

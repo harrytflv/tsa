@@ -186,15 +186,62 @@ class PeerReviewAnalyzer(object):
       libStu2Score[stu].append(scores[ite])
     return {k: np.average(v) for k, v in libStu2Score.items()}
 
+  def tf_idf(self):
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from nltk.stem.porter import PorterStemmer
+    from nltk.corpus import stopwords
+    from nltk import tokenize
+    import string
+    stemmer = PorterStemmer()
+    translator = str.maketrans({key: None for key in string.punctuation})
+    def tokenize_sentence(sent):
+      sanitized = sent.lower().translate(translator)
+      tokens = filter(lambda x: not x in stopwords.words('english'), tokenize.word_tokenize(sanitized))
+      return [stemmer.stem(wd) for wd in tokens]
+    sentences = []
+    for item in self.dataset:
+      for comment in self.dataset.get_comments(item):
+        for sent in tokenize.sent_tokenize(comment):
+          sentences.append(sent)
+    tfidf = TfidfVectorizer(tokenizer=tokenize_sentence, stop_words='english')
+    vecs = tfidf.fit_transform(sentences)
+    return vecs, tfidf, sentences
+
+  def tf_idf_plot(self):
+    from sklearn.manifold import TSNE
+    from sklearn.cluster import KMeans
+    vecs, _, sentences= self.tf_idf()
+    with open('results/sentences.csv', 'w') as f_out:
+      f_out.write('\n'.join(sentences))
+
+    cluster_model = KMeans(n_clusters=8)
+    labels = cluster_model.fit_predict(vecs)
+    for i in range(8):
+      with open('results/clusters{}.txt'.format(i), 'w') as f_out:
+        for sent, label in zip(sentences, labels):
+          if label == i:
+            f_out.write(sent)
+            f_out.write('\n')
+
+    model = TSNE(n_components=2)
+    tsne_vec = model.fit_transform(vecs.toarray())
+    plotdata = pd.DataFrame({'d1': tsne_vec[:,0], 'd2': tsne_vec[:,1], 'color': labels})
+
+    fig, ax = plt.subplots()
+    sns.lmplot('d1', 'd2', data=plotdata, hue='color', fit_reg=False)
+    plt.savefig('results/tf_idf.png')
+    plt.close(fig)
+
 def main():
   # dataset = PeerReview('data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')
   dataset = PeerReview('data/', 'peer_combined')
   analyzer = PeerReviewAnalyzer(dataset)
-  analyzer.consistency_more_grade()
-  analyzer.consistency()
+  # analyzer.consistency_more_grade()
+  # analyzer.consistency()
   # analyzer.sentiment_analysis_single()
   # analyzer.sentiment_analysis_iteration()
   # analyzer.token_freq()
+  analyzer.tf_idf_plot()
 
 if __name__ == '__main__':
   main()

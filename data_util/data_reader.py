@@ -43,10 +43,30 @@ class PeerReview(Dataset):
   def students(self):
     set_students = set()
     for item in self:
-      for i in [1,2,3,4]:
+      for i in [1, 2, 3, 4, 5, 6]:
         key = 'What is your name? (Person 1)'.format(i) if i == 1 else 'Person {}:'.format(i)
         set_students.add(item[key])
     return set_students
+
+  def get_comments(self, item, index=-1):
+    if index in [1, 2, 3, 4, 5, 6]:
+      return item['Comments about Person {}:'.format(index)]
+    return [item['Comments about Person {}:'.format(i)] for i in [1, 2, 3, 4, 5, 6]]
+
+  def get_grades(self, item, index=-1):
+    if index in [1, 2, 3, 4, 5, 6]:
+      return item['Rating for Person {}:'.format(index)]
+    return [item['Rating for Person {}:'.format(i)] for i in [1, 2, 3, 4, 5, 6]]
+
+  def get_students(self, item, index=-1):
+    if index in [1, 2, 3, 4, 5, 6]:
+      stu_key = 'What is your name? (Person 1)'.format(index) if index == 1 else 'Person {}:'.format(index)
+      return item[stu_key]
+    students = []
+    for item in [1, 2, 3, 4, 5, 6]:
+      stu_key = 'What is your name? (Person 1)'.format(i) if i == 1 else 'Person {}:'.format(i)
+      students.append(item[stu_key])
+    return students
 
 class ProjectInfo(Dataset):
   def _preload(self):

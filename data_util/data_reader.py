@@ -78,11 +78,19 @@ class ProjectInfo(Dataset):
           'ID': row['Team#'],
           'project': row['Project'],
           'deployment': row['Deployment'],
-          'repo': row['Repo'],
+          'repo': self._get_repo_info(row['Repo']),
           'code_climate': row['CodeClimate'],
           'tracker': row['Tracker'].split('/')[-1],
           'students': [item.strip() for item in row['Students'].split(',')]
         })
+
+  def _get_repo_info(self, repo_url):
+    info_lst = repo_url.split('/')
+    index = info_lst.index('github.com')
+    return {
+      'owner': info_lst[index+1],
+      'repo': info_lst[index+2]
+    }
 
 def main():
   dataset = PeerReview('../data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')

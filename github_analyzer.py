@@ -17,6 +17,7 @@ class GithubAnalyzer(object):
     super(GithubAnalyzer, self).__init__()
     self.client = GithubApi(token)
     self.projects = project_info
+    self.commit_cache = False
 
   def commits(self, reload=False):
     if reload:
@@ -43,13 +44,44 @@ class GithubAnalyzer(object):
           user_commits[user_map[user]].append(commit)
     return user_commits
 
-  def cache_commits(self):
+  def get_commit(self, sha):
+    if not self.commit_cache:
+      with open('cache/sha2commit_new.json', 'r') as f_in:
+        self.commit_cache = json.load(f_in)
+    if sha in self.commit_cache:
+      return self.commit_cache[sha]
+    else:
+      return False
+
+  ''' 
+      Cache all commits. This will take about two hours for cs169 fall 2016. 
+      Fix is used for fixing some error messages.
+  '''
+  def cache_commits(self, fix=True):
+    import time
+    if fix:
+      print('Fix mode')
+      with open('cache/sha2commit.json', 'r') as f_in:
+        sha2commit = json.load(f_in)
+      all_commits = self.commits(reload=True)
+      for index, commits in enumerate(all_commits):
+        owner, repo = self.projects[index]['repo']['owner'], self.projects[index]['repo']['repo']
+        for commit in commits:
+          info = sha2commit[commit['sha']]
+          if 'message' in info:
+            sha2commit[commit['sha']] = self.client.get_commit(owner, repo, commit['sha'])
+            time.sleep(0.1)
+      with open('cache/sha2commit_new.json', 'w') as f_out:
+        json.dump(sha2commit, f_out)
+      return
+    print('Cache mode')
     dictSha2Commit = {}
     all_commits = self.commits(reload=True)
     for index, commits in enumerate(all_commits):
       owner, repo = self.projects[index]['repo']['owner'], self.projects[index]['repo']['repo']
       for commit in commits:
         dictSha2Commit[commit['sha']] = self.client.get_commit(owner, repo, commit['sha'])
+        time.sleep(0.01)
     with open('cache/sha2commit.json', 'w') as f_out:
       json.dump(dictSha2Commit, f_out, sort_keys=True, indent=4, separators=(',', ': '))
 
@@ -108,12 +140,16 @@ class GithubAnalyzer(object):
     wd_2 = ', '.join(reversed(wd_2.split(' ')))
     return nltk.edit_distance(wd_1.lower(), wd_2.lower())
 
+  def extract_proj(self, commit):
+    info = commit['url'].split('/')
+    ind = info.index('api.github.com')
+    return '{}/{}'.format(info[ind+2], info[ind+3])
+
 def main():
   with open('conf/tokens.json', 'r') as f_in:
     token = json.load(f_in)
   project_info = ProjectInfo('data/CS 169 F16 Projects - Sheet1.csv', 'proj-info')
   analyzer = GithubAnalyzer(token['github']['token'], project_info)
-  analyzer.cache_commits()
   # analyzer.commits_plot()
   # analyzer.commmits_per_student_plot()
 

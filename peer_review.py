@@ -58,7 +58,7 @@ class PeerReviewAnalyzer(object):
               scores.append(score)
               students.append(student)
 
-    print(len(sentences))
+    # print(len(sentences))
     return sentences, grading, scores, students
 
   def sentiment_analysis_single(self, filtered=False):
@@ -232,6 +232,31 @@ class PeerReviewAnalyzer(object):
     plt.savefig('results/tf_idf.png')
     plt.close(fig)
 
+  def iteration_grades_scores(self, filtered=False):
+    grading, scores, students = [], [], []
+    for ite in range(4):
+      _, tmp_g, tmp_s, tmp_st = self.sentiment_analysis(self.dataset.iterations[ite], filtered)
+      grading.append(tmp_g)
+      scores.append(tmp_s)
+      students.append(tmp_st)
+    return grading, scores, students
+
+  def iteration_grades(self):
+    stu2grad = defaultdict(lambda: [[], [], [], []])
+    for ite, dataset in enumerate(self.dataset.iterations):
+      for item in dataset:
+        for i in [1,2,3,4,5,6]:
+          grade = item['Rating for Person {}:'.format(i)]
+          stu_key = 'What is your name? (Person 1)'.format(i) if i == 1 else 'Person {}:'.format(i)
+          if grade:
+            stu2grad[item[stu_key]][ite].append(int(grade))
+    result = {}
+    for k, v in stu2grad.items():
+      if not [] in v:
+        result[k] = [np.average(item) for item in v]
+    return result
+    # return {k: [np.average(ite) if len(ite)>0 else 0.0 for ite in v] for k, v in stu2grad.items()}
+
 def main():
   # dataset = PeerReview('data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')
   dataset = PeerReview('data/', 'peer_combined')
@@ -241,7 +266,7 @@ def main():
   # analyzer.sentiment_analysis_single()
   # analyzer.sentiment_analysis_iteration()
   # analyzer.token_freq()
-  analyzer.tf_idf_plot()
+  # analyzer.tf_idf_plot()
 
 if __name__ == '__main__':
   main()

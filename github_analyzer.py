@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns
 from collections import defaultdict
 import nltk
+import datetime
 
 from github_api.github_api import GithubApi
 from data_util.data_reader import ProjectInfo
@@ -145,6 +146,20 @@ class GithubAnalyzer(object):
     ind = info.index('api.github.com')
     return '{}/{}'.format(info[ind+2], info[ind+3])
 
+  def iteration_commits(self):
+    commits = self.commits(reload=True)
+    iterations = [[], [], [], []]
+    with open('conf/iterations.json', 'r') as f_in:
+      timestamps = json.load(f_in)
+    timestamps = [datetime.datetime.strptime(s, '%Y-%m-%d') for s in timestamps]
+    for proj in commits:
+      for commit in proj:
+        t = datetime.datetime.strptime(commit['commit']['author']['date'], '%Y-%m-%dT%H:%M:%SZ')
+        i = np.searchsorted(timestamps, t)
+        if i in [1, 2, 3, 4]:
+          iterations[i-1].append(commit)
+    return iterations
+
 def main():
   with open('conf/tokens.json', 'r') as f_in:
     token = json.load(f_in)
@@ -152,6 +167,7 @@ def main():
   analyzer = GithubAnalyzer(token['github']['token'], project_info)
   # analyzer.commits_plot()
   # analyzer.commmits_per_student_plot()
+  analyzer.iteration_commits()
 
 if __name__ == '__main__':
   main()

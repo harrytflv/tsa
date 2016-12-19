@@ -7,6 +7,7 @@ import pandas as pd
 from collections import defaultdict
 import json
 import time
+import datetime
 from tqdm import tqdm
 
 from data_util.data_reader import ProjectInfo
@@ -67,12 +68,54 @@ class PivotalTrackerAnalyzer(object):
     return {k: float(v)/float(total_pnts) for k, v in dictStu2Pnts.items()},\
            {k: float(v)/float(total_num) for k, v in dictStu2Num.items()}
 
+  def _iteration_points(self, project_id, num_stu):
+    dictStu2Pnts, dictStu2Num = defaultdict(lambda: np.zeros((4,))), defaultdict(lambda: np.zeros((4,)))
+    total_pnts, total_num = np.ones((4,)), np.ones((4,))
+    with open('conf/iterations.json', 'r') as f_in:
+      timestamps = json.load(f_in)
+    timestamps = [datetime.datetime.strptime(s, '%Y-%m-%d') for s in timestamps]
+    for story in self.client.get_stories(project_id):
+      # t = datetime.datetime.fromtimestamp(int(story['updated_at'])/1e3)
+      t = datetime.datetime.strptime(story['updated_at'], '%Y-%m-%dT%H:%M:%SZ')
+      ind = np.searchsorted(timestamps, t)
+      pnts = story['estimate'] if 'estimate' in story else 1
+  
+      if ind in [1, 2, 3, 4]:
+        ind = ind - 1
+        total_pnts[ind] += pnts
+        total_num[ind] += 1
+        owners = self.client.get_story_owners(project_id, story['id'])
+        for owner in owners:
+          dictStu2Num[owner['name']][ind] += 1
+          dictStu2Pnts[owner['name']][ind] += pnts
+      time.sleep(0.1) # Prevent too frequent requests
+    for i in range(num_stu-len(dictStu2Num)):
+      dictStu2Num[project_id+str(i)+'#'] = np.zeros((4,))
+      dictStu2Pnts[project_id+str(i)+'#'] = np.zeros((4,))
+    return {k: (v/total_pnts).tolist() for k, v in dictStu2Pnts.items()},\
+           {k: (v/total_num).tolist() for k, v in dictStu2Num.items()}
+
+  def iteration_points(self, reload=False):
+    if reload:
+      with open('cache/student_iter_pnts.json', 'r') as f_in:
+        cache = json.load(f_in)
+      return cache['points'], cache['number']
+    dictPnts, dictNum = {}, {}
+    for project in tqdm(self.project_info, desc='Project'):
+      dictStu2Pnts, dictStu2Num = self._iteration_points(project['tracker'], len(project['students']))
+      dictPnts.update(dictStu2Pnts)
+      dictNum.update(dictStu2Num)
+    with open('cache/student_iter_pnts.json', 'w') as f_out:
+      json.dump({'points': dictPnts, 'number': dictNum}, f_out)
+    return dictPnts, dictNum
+
 def main():
   with open('conf/tokens.json', 'r') as f_in:
     tokens = json.load(f_in)
   project_info = ProjectInfo('data/CS 169 F16 Projects - Sheet1.csv', 'project-info')
   analyzer = PivotalTrackerAnalyzer(project_info, tokens['pivotal_tracker']['token'])
-  analyzer.story_assign_plot()
+  # analyzer.story_assign_plot()
+  analyzer.iteration_points()
 
 if __name__ == '__main__':
   main()

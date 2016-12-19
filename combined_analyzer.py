@@ -89,9 +89,110 @@ class CombinedAnalyzer(object):
       print('Unrecognizable w_type.')
       return 0
 
-  def grade_prediction(self):
-    for 
-    self.pr_analyzer.
+  def grade_prediction(self, w_type):
+    with open('cache/new_user_mapping.json', 'r') as f_in:
+      user_map = json.load(f_in)
+    stu_grades  = self.pr_analyzer.iteration_grades()
+    stu2grad = {}
+    for k, v in stu_grades.items():
+      if k in user_map:
+        stu2grad[user_map[k]] = v
+    stu_commits = self.iteration_workload(w_type)
+    stu2cmit = {}
+    for k, v in stu_commits.items():
+      if k in user_map:
+        stu2cmit[user_map[k]] = v
+    iter_points, iter_num = self.pt_analyzer.iteration_points(reload=True)
+    stu2pnts = {}
+    for k, v in iter_points.items():
+      if k in user_map:
+        stu2pnts[user_map[k]] = v
+    return stu2grad, stu2cmit, stu2pnts
+
+  def iteration_workload(self, w_type):
+    iterations = self.gt_analyzer.iteration_commits()
+    stu_map, proj_total = defaultdict(lambda: np.zeros((4,))), defaultdict(lambda: np.zeros((4,)))
+    stu2proj = {}
+    for i in range(4):
+      for commit in iterations[i]:
+        stu = commit['commit']['author']['name']
+        proj = self.gt_analyzer.extract_proj(commit)
+        info = self._get_info(commit, w_type)
+
+        stu2proj[stu] = proj
+        stu_map[stu][i] += info
+        proj_total[proj][i] += info
+    if 'normalized' in w_type:
+      stu_map = {k: v/proj_total[stu2proj[k]] for k, v in stu_map.items()}
+    return stu_map
+
+  def prediction(self, w_type):
+    from sklearn.linear_model import LinearRegression
+    from sklearn.naive_bayes import GaussianNB
+    stu2grad, stu2cmit, stu2pnts = self.grade_prediction(w_type)
+    avg_grade = np.average([v for _, v in stu2grad.items()])
+    set_stu = set(stu2grad.keys()) & set(stu2cmit.keys()) & set(stu2pnts.keys())
+    print('Total number of students: {}'.format(len(set_stu)))
+
+    linear_result = []
+    for k, v in stu2grad.items():
+      if k in set_stu:
+        linear_model = LinearRegression()
+        linear_model.fit(np.array([[1.0], [2.0], [3.0]]), v[:3])
+        linear_result.append((linear_model.predict([[4]])[0]-v[3])**2)
+    print(np.average(linear_result))
+    fig, ax = plt.subplots()
+    plotdata = pd.Series(linear_result, name='squared error')
+    sns.distplot(plotdata)
+    plt.savefig('results/linear_prediction.png')
+    plt.close(fig)
+
+    training_feature, training_label = [], []
+    predict_feature, predict_label = [], []
+    for k in set_stu:
+      tmp_grad, tmp_cmit, tmp_pnts = stu2grad[k], stu2cmit[k], stu2pnts[k]
+      for ite in range(3):
+        training_feature.append([tmp_cmit[ite], tmp_pnts[ite]])
+        # training_label.append(np.rint(tmp_grad[ite]))
+        training_label.append(tmp_grad[ite])
+      predict_feature.append([tmp_cmit[3], tmp_pnts[3]])
+      predict_label.append(tmp_grad[3])
+    # nb_model = GaussianNB()
+    model = LinearRegression()
+    model.fit(np.array(training_feature), np.array(training_label))
+    predicts = model.predict(np.array(predict_feature))
+    result = (predicts-np.array(predict_label))**2
+    print(np.average(result))
+    print(model.coef_)
+    fig, ax = plt.subplots()
+    plotdata = pd.Series(result, name='squared error')
+    sns.distplot(plotdata)
+    plt.savefig('results/linear_gt_pt_prediction.png')
+    plt.close(fig)
+
+    training_feature, training_label = [], []
+    predict_feature, predict_label = [], []
+    for k in set_stu:
+      tmp_grad, tmp_cmit, tmp_pnts = stu2grad[k], stu2cmit[k], stu2pnts[k]
+      tmp_avg = [avg_grade] + [np.average(tmp_grad[:i+1]) for i in range(3)]
+      for ite in range(3):
+        training_feature.append([tmp_cmit[ite], tmp_pnts[ite], tmp_avg[ite]])
+        # training_label.append(np.rint(tmp_grad[ite]))
+        training_label.append(tmp_grad[ite])
+      predict_feature.append([tmp_cmit[3], tmp_pnts[3], tmp_avg[3]])
+      predict_label.append(tmp_grad[3])
+    # nb_model = GaussianNB()
+    model = LinearRegression()
+    model.fit(np.array(training_feature), np.array(training_label))
+    predicts = model.predict(np.array(predict_feature))
+    result = (predicts-np.array(predict_label))**2
+    print(np.average(result))
+    print(model.coef_)
+    fig, ax = plt.subplots()
+    plotdata = pd.Series(result, name='squared error')
+    sns.distplot(plotdata)
+    plt.savefig('results/linear_gt_pt_avg_prediction.png')
+    plt.close(fig)
 
 def main():
   with open('conf/tokens.json', 'r') as f_in:
@@ -106,8 +207,9 @@ def main():
 
   analyzer = CombinedAnalyzer(gt_analyzer=gt_analyzer, pt_analyzer=pt_analyzer, pr_analyzer=pr_analyzer)
   # analyzer.workload_correlation_plot(w_type='num_commits_normalized')
-  analyzer.workload_correlation_plot(w_type='file_edit_normalized')
+  # analyzer.workload_correlation_plot(w_type='file_edit_normalized')
   # analyzer.workload_correlation_plot(w_type='line_edit')
+  analyzer.prediction('file_edit_normalized')
 
 if __name__ == '__main__':
   main()

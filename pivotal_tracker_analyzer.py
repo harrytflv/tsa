@@ -14,14 +14,28 @@ from data_util.data_reader import ProjectInfo
 from pivotal_tracker_api.tracker_api import TrackerApi
 
 class PivotalTrackerAnalyzer(object):
-  """docstring for PivotalTrackerAnalyzer"""
+  """
+    Generate pivotal tracker statistics and visualization.
+  """
   def __init__(self, project_info, token):
+    """
+      Input
+        - project_info: project information data
+        - token: tracker access token
+    """
     super(PivotalTrackerAnalyzer, self).__init__()
     self.project_info = project_info
     self.client = TrackerApi(token)
   
-  '''Generate the task assignment within team'''
   def story_assign(self, reload=False):
+    '''
+      Generate the task assignment within team. Ownership is defined by own relation.
+      If reload=True, use cached file. Otherwise generate and cache the result.
+
+      Output
+        - dictPnts: dictionary from a tracker user name to fraction of points
+        - dictNum: dictionary from a tracker user name to fraction of number of stories
+    '''
     if reload:
       with open('cache/student_points_num.json', 'r') as f_in:
         cache = json.load(f_in)
@@ -35,8 +49,11 @@ class PivotalTrackerAnalyzer(object):
       json.dump({'points': dictPnts, 'number': dictNum}, f_out)
     return dictPnts, dictNum
 
-  '''Plot the data'''
   def story_assign_plot(self, reload=False):
+    '''
+      Plot
+        - histogram of story assignment, both fraction of points and numbers are plotted
+    '''
     dictPnts, dictNums = self.story_assign()
     lstPnts = [v for _, v in dictPnts.items()]
     lstNums = [v for _, v in dictNums.items()]
@@ -48,8 +65,8 @@ class PivotalTrackerAnalyzer(object):
     plt.savefig('results/story_assign.png')
     plt.close(fig)
 
-  '''Process single project'''
   def _story_assign(self, project_id, num_stu):
+    '''Process single project.'''
     dictStu2Pnts, dictStu2Num = defaultdict(lambda: 0), defaultdict(lambda: 0)
     total_pnts, total_num = 0, 0
     for story in self.client.get_stories(project_id):
@@ -68,7 +85,30 @@ class PivotalTrackerAnalyzer(object):
     return {k: float(v)/float(total_pnts) for k, v in dictStu2Pnts.items()},\
            {k: float(v)/float(total_num) for k, v in dictStu2Num.items()}
 
+  def iteration_points(self, reload=False):
+    '''
+      Generate the task assignment within team divided by iterations. Ownership is defined by own relation.
+      If reload=True, use cached file. Otherwise generate and cache the result.
+
+      Output
+        - dictPnts: dictionary from a tracker user name to a list of fraction of points
+        - dictNum: dictionary from a tracker user name to a list of fraction of number of stories
+    '''
+    if reload:
+      with open('cache/student_iter_pnts.json', 'r') as f_in:
+        cache = json.load(f_in)
+      return cache['points'], cache['number']
+    dictPnts, dictNum = {}, {}
+    for project in tqdm(self.project_info, desc='Project'):
+      dictStu2Pnts, dictStu2Num = self._iteration_points(project['tracker'], len(project['students']))
+      dictPnts.update(dictStu2Pnts)
+      dictNum.update(dictStu2Num)
+    with open('cache/student_iter_pnts.json', 'w') as f_out:
+      json.dump({'points': dictPnts, 'number': dictNum}, f_out)
+    return dictPnts, dictNum
+
   def _iteration_points(self, project_id, num_stu):
+    """Process single project"""
     dictStu2Pnts, dictStu2Num = defaultdict(lambda: np.zeros((4,))), defaultdict(lambda: np.zeros((4,)))
     total_pnts, total_num = np.ones((4,)), np.ones((4,))
     with open('conf/iterations.json', 'r') as f_in:
@@ -95,19 +135,6 @@ class PivotalTrackerAnalyzer(object):
     return {k: (v/total_pnts).tolist() for k, v in dictStu2Pnts.items()},\
            {k: (v/total_num).tolist() for k, v in dictStu2Num.items()}
 
-  def iteration_points(self, reload=False):
-    if reload:
-      with open('cache/student_iter_pnts.json', 'r') as f_in:
-        cache = json.load(f_in)
-      return cache['points'], cache['number']
-    dictPnts, dictNum = {}, {}
-    for project in tqdm(self.project_info, desc='Project'):
-      dictStu2Pnts, dictStu2Num = self._iteration_points(project['tracker'], len(project['students']))
-      dictPnts.update(dictStu2Pnts)
-      dictNum.update(dictStu2Num)
-    with open('cache/student_iter_pnts.json', 'w') as f_out:
-      json.dump({'points': dictPnts, 'number': dictNum}, f_out)
-    return dictPnts, dictNum
 
 def main():
   with open('conf/tokens.json', 'r') as f_in:

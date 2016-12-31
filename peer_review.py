@@ -16,6 +16,12 @@ class PeerReviewAnalyzer(object):
     self.dataset = dataset
 
   def token_freq(self):
+    """
+      Analyze token frequency of comments. Based on nltk tokenizer. Stop words are removed.
+      
+      Plot
+        - a bar plot of first 100 most frequent tokens
+    """
     from nltk.tokenize import RegexpTokenizer
     tokenizer = RegexpTokenizer(r'\w+')
     token_counter = defaultdict(lambda: 0)
@@ -37,6 +43,21 @@ class PeerReviewAnalyzer(object):
     plt.close(fig)
 
   def sentiment_analysis(self, dataset, filtered):
+    """
+      Generate sentiment analysis result, together with other data used for comparison
+      Sentiment analysis is processed on sentence level.
+      Based on nltk tokenizer and sentiment analyzer
+
+      Input
+        - dataset: a list of peer reviews
+        - filtered: if True, sentences with a sentiment score around 0 (abs<0.01) will be removed
+
+      Output
+        - sentences: a list of comment sentences
+        - grading: peer review grades, in {1, 2, 3, 4, 5}
+        - scores: sentiment analysis score in [-1, 1]
+        - students: the student reviewed
+    """
     from nltk.sentiment.vader import SentimentIntensityAnalyzer
     from nltk import tokenize
 
@@ -62,6 +83,10 @@ class PeerReviewAnalyzer(object):
     return sentences, grading, scores, students
 
   def sentiment_analysis_single(self, filtered=False):
+    """
+      Plot
+        - a scatter plot of peer review grades and sentiment analysis scores
+    """
     sentences, grading, scores, _ = self.sentiment_analysis(self.dataset, filtered)
 
     fig, ax = plt.subplots()
@@ -72,6 +97,10 @@ class PeerReviewAnalyzer(object):
     plt.close(fig)
 
   def sentiment_analysis_iteration(self, filtered=False):
+    """
+      Plot
+        - a correlation plot of peer review grades and sentiment analysis scores divided into iterations.
+    """
     frames = []
     for ite in range(4):
       sentences, grading, scores, _ = self.sentiment_analysis(self.dataset.iterations[ite], filtered)

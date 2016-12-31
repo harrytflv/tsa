@@ -194,6 +194,17 @@ class CombinedAnalyzer(object):
     plt.savefig('results/linear_gt_pt_avg_prediction.png')
     plt.close(fig)
 
+    mse1, mse2, mse3 = [], [], []
+    for _, v in stu2grad.items():
+      vv = np.array(v)
+      mse1.append(np.sum((vv[1:]-np.average(vv[:1]))**2))
+      mse2.append(np.sum((vv[2:]-np.average(vv[:2]))**2))
+      mse3.append(np.sum((vv[3:]-np.average(vv[:3]))**2))
+    print(np.average(mse1))
+    print(np.average(mse2))
+    print(np.average(mse3))
+
+
 def main():
   with open('conf/tokens.json', 'r') as f_in:
     tokens = json.load(f_in)

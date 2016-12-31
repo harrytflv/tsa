@@ -13,14 +13,28 @@ from github_api.github_api import GithubApi
 from data_util.data_reader import ProjectInfo
 
 class GithubAnalyzer(object):
-  """docstring for GithubAnalyzer"""
+  """
+    Provide functions to get github statistics and visualize results.
+  """
   def __init__(self, token, project_info):
+    """
+      Input
+        - token: used to access github
+        - project_info: course project data
+    """
     super(GithubAnalyzer, self).__init__()
     self.client = GithubApi(token)
     self.projects = project_info
     self.commit_cache = False
 
   def commits(self, reload=False):
+    """
+      Get all commits of all projects.
+      If reload=True, use cached results. Otherwise get data from APIs and cache the result.
+
+      Output
+        - a list of lists, each list contains all commits of a repository(project).
+    """
     if reload:
       with open('cache/commits.json', 'r') as f_in:
         return json.load(f_in)
@@ -34,6 +48,15 @@ class GithubAnalyzer(object):
     return lstCommits
 
   def user_commits(self, reload=True):
+    """
+      Get a dictionary with user ID as key and a list of commits as value.
+      self.commits will be called with the input reload.
+
+      WARNING: assume a user map cache file cache/new_user_mapping.json exists
+
+      Output
+        - a dictionary between user ID and list of commits of the user
+    """
     all_commits = self.commits(reload)
     with open('cache/new_user_mapping.json', 'r') as f_in:
       user_map = json.load(f_in)
@@ -46,6 +69,12 @@ class GithubAnalyzer(object):
     return user_commits
 
   def get_commit(self, sha):
+    """
+      Return the information of a single commit. It assumes the cache file cache/sha2commit_new.json exists.
+
+      Output
+        - a dictionary of commit information, or False if the given commit can't be found
+    """
     if not self.commit_cache:
       with open('cache/sha2commit_new.json', 'r') as f_in:
         self.commit_cache = json.load(f_in)
@@ -54,11 +83,15 @@ class GithubAnalyzer(object):
     else:
       return False
 
-  ''' 
-      Cache all commits. This will take about two hours for cs169 fall 2016. 
-      Fix is used for fixing some error messages.
-  '''
   def cache_commits(self, fix=True):
+    '''
+        Cache all commits. This will take about two hours for cs169 fall 2016.
+        Fix is used for fixing some error messages.
+        This function should be called only once. It will generate cache/sha2commit_new.json file.
+
+        TODO: FUNCTION NEEDS REFACTOR.
+    '''
+
     import time
     if fix:
       print('Fix mode')
@@ -87,6 +120,10 @@ class GithubAnalyzer(object):
       json.dump(dictSha2Commit, f_out, sort_keys=True, indent=4, separators=(',', ': '))
 
   def commits_plot(self):
+    """
+      Plot
+        - a histogram of number of commits per project
+    """
     lstCommits = self.commits(reload=True)
 
     plotdata = pd.DataFrame({'x': np.arange(len(lstCommits)), 'y': [len(item) for item in lstCommits]})
@@ -96,6 +133,10 @@ class GithubAnalyzer(object):
     plt.close(fig)
 
   def commmits_per_student_plot(self):
+    """
+      Plot
+        - Histogram of number of commits per student.
+    """
     lstCommits = self.commits(reload=True)
     dictStu2Commits = defaultdict(lambda: 0)
     for proj_commit in lstCommits:
@@ -107,6 +148,16 @@ class GithubAnalyzer(object):
     plt.close(fig)
 
   def generate_user_map(self):
+    """
+      Generate a user mapping which maps a github username to the User ID.
+      It will go through all usernames and compare it with existing usernames from pivotal tracker and student info.
+      Candidates are listed based on edit distance.
+      Input 'Y' will link the username to the User ID of the candidate. Input 'S' will skip all candidates.
+      It will generate cache/new_user_mapping.json. It assumes cache/user_mapping.json exists, which is a mapp from
+      tracker users and students to user ID.
+
+      TODO: NEED REFACTOR
+    """
     with open('cache/user_mapping.json', 'r') as f_in:
       user_map = json.load(f_in)
     self.student_list = user_map.keys()
@@ -147,6 +198,13 @@ class GithubAnalyzer(object):
     return '{}/{}'.format(info[ind+2], info[ind+3])
 
   def iteration_commits(self):
+    """
+      Group commits into interations.
+      Assume conf/iterations.json exists. Assume there are four iterations.
+
+      Output
+        - a list of four lists containing all commits of that iteration.
+    """
     commits = self.commits(reload=True)
     iterations = [[], [], [], []]
     with open('conf/iterations.json', 'r') as f_in:

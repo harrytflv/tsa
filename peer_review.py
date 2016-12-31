@@ -114,6 +114,11 @@ class PeerReviewAnalyzer(object):
     plt.close(fig)
 
   def consistency(self, filtered=False, divide_by_iterations=True):
+    """
+      Plot
+        - a histogram of averaged grades and scores for a single student
+        - a histogram of standard error of grades and scores for a single student
+    """
     if divide_by_iterations:
       grading, scores, students = [], [], []
       for ite in range(4):
@@ -152,6 +157,9 @@ class PeerReviewAnalyzer(object):
     plt.close(fig)
 
   def consistency_more_grade(self, filtered=False, divide_by_iterations=True, plot=True):
+    """
+      Similar to consistency. For peer review, all reviews are considered.
+    """
     if divide_by_iterations:
       grading, scores, students = [], [], []
       for ite in range(4):
@@ -199,6 +207,12 @@ class PeerReviewAnalyzer(object):
     plt.close(fig)
 
   def avg_grade(self):
+    """
+      Generate average peer review grades of a student
+
+      Output
+        - a dictionary from student name to average peer review grades
+    """
     libStu2Grade= defaultdict(lambda: [])
     for item in self.dataset:
       for i in [1,2,3,4,5,6]:
@@ -209,6 +223,13 @@ class PeerReviewAnalyzer(object):
     return {k: np.average(v) for k, v in libStu2Grade.items()}
 
   def avg_score(self, filtered=False):
+    """
+      Generate average sentiment analysis scores of a student
+      Student should have at least one review with comment
+
+      Output
+        - a dictionary from student name to average sentiment analysis score
+    """
     _, grading, scores, students = self.sentiment_analysis(self.dataset, filtered)
     libStu2Score = defaultdict(lambda: [])
     for ite, stu in enumerate(students):
@@ -262,6 +283,14 @@ class PeerReviewAnalyzer(object):
     plt.close(fig)
 
   def iteration_grades_scores(self, filtered=False):
+    """
+      Generate sentiment analysis results and other information by iterations
+
+      Output
+        - grading: peer review gradings, separated by iterations
+        - scores: sentiment analysis scores, separated by iterations
+        - students: student names, separated by iterations
+    """
     grading, scores, students = [], [], []
     for ite in range(4):
       _, tmp_g, tmp_s, tmp_st = self.sentiment_analysis(self.dataset.iterations[ite], filtered)
@@ -271,6 +300,12 @@ class PeerReviewAnalyzer(object):
     return grading, scores, students
 
   def iteration_grades(self):
+    """
+      Generate average peer review grades for a student, separate by iterations
+
+      Output
+        - a dictionary between student name to a list of average peer review grades.
+    """
     stu2grad = defaultdict(lambda: [[], [], [], []])
     for ite, dataset in enumerate(self.dataset.iterations):
       for item in dataset:

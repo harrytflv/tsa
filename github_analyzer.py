@@ -26,6 +26,7 @@ class GithubAnalyzer(object):
     self.client = GithubApi(token)
     self.projects = project_info
     self.commit_cache = False
+    self.project_cache = False
 
   def commits(self, reload=False):
     """

@@ -43,24 +43,29 @@ class CombinedAnalyzer(object):
     self.proj_info = defaultdict(lambda: 0)
     cmit, pnts, grad, scor, _ = self.workload_correlation()
     self._get_project_total(cmit, w_type)
-    plotdata = pd.DataFrame({w_type:[self._workload(item, w_type) for item in cmit],
-                             'frac points':pnts,
-                             'avg grade': grad,
+    plotdata = pd.DataFrame({'Fraction of GitHub files edited':[self._workload(item, w_type) for item in cmit],
+                             'Fraction of Pivotal Tracker story points':pnts,
+                             'Average peer review  grade': grad,
                              'avg score': scor})
-    fig, ax = plt.subplots()
-    sns.pairplot(plotdata, kind='reg', vars=[w_type, 'frac points', 'avg grade'])
-    plt.savefig('results/combined_correlation_{}.png'.format(w_type))
-    plt.close(fig)
+    # fig, ax = plt.subplots()
+    # sns.pairplot(plotdata, kind='reg', vars=[w_type, 'frac points', 'avg grade'])
+    # plt.savefig('results/combined_correlation_{}.png'.format(w_type))
+    # plt.close(fig)
+
 
     fig, ax = plt.subplots()
-    sns.jointplot(x=w_type, y='frac points', data=plotdata, kind='reg')
-    plt.savefig('results/commit_pnts_correlation_{}.png'.format(w_type))
+    sns.jointplot(x='Fraction of GitHub files edited', y='Average peer review  grade', data=plotdata, kind='reg')
+    plt.savefig('results/wip_correlation_files_edit.png'.format(w_type))
     plt.close(fig)
 
-    fig, ax = plt.subplots()
-    sns.jointplot(x=w_type, y='avg grade', data=plotdata, kind='reg')
-    plt.savefig('results/commit_grad_correlation_{}.png'.format(w_type))
-    plt.close(fig)
+    fix, ax = plt.subplots()
+    sns.jointplot(x='Fraction of Pivotal Tracker story points', y='Average peer review  grade', data=plotdata, kind='reg')
+    plt.savefig('results/wip_correlation_pt_points.png')
+
+    # fig, ax = plt.subplots()
+    # sns.jointplot(x=w_type, y='avg grade', data=plotdata, kind='reg')
+    # plt.savefig('results/commit_grad_correlation_{}.png'.format(w_type))
+    # plt.close(fig)
 
   def _workload(self, commits, w_type):
     info = np.sum([self._get_info(commit, w_type) for commit in commits])
@@ -218,7 +223,7 @@ def main():
 
   analyzer = CombinedAnalyzer(gt_analyzer=gt_analyzer, pt_analyzer=pt_analyzer, pr_analyzer=pr_analyzer)
   # analyzer.workload_correlation_plot(w_type='num_commits_normalized')
-  # analyzer.workload_correlation_plot(w_type='file_edit_normalized')
+  analyzer.workload_correlation_plot(w_type='file_edit_normalized')
   # analyzer.workload_correlation_plot(w_type='line_edit')
   analyzer.prediction('file_edit_normalized')
 

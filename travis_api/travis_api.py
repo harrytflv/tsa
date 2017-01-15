@@ -49,6 +49,28 @@ class TravisApi(object):
       least_number = min([int(bd['number']) for bd in page])
     return builds
 
+  def show_build(self, build_id):
+    """
+      Show a detailed information about a given build
+      https://docs.travis-ci.com/api?http#builds
+
+      Input
+        - build_id: the id of the build
+    """
+    url = self._resource('builds/{}'.format(build_id))
+    return self._request(url, requests.get)
+
+  def get_log(self, job_id):
+    """
+      Get the output of a given job.
+      https://docs.travis-ci.com/api?http#logs
+
+      Input
+        - job_id: the id of the job
+    """
+    url = self._resource('jobs/{}/log'.format(job_id))
+    return self._request(url, requests.get)
+
   def _add_headers(self, params={}):
     media = params.pop('media', 'application/vnd.travis-ci.2+json')
     user_agent = params.pop('User-Agent', 'Travis/1.6.8')
@@ -76,7 +98,8 @@ def main():
   print(client.get_account())
   builds = client.list_builds('DrakeW', 'projectscope')
   print(len(builds))
-  # print([build['number'] for build in builds])
+  print(client.show_build(builds[0]['id']))
+  print(list(client.get_log(builds[0]['job_ids'][0]).keys()))
 
 if __name__ == '__main__':
   main()

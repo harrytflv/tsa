@@ -22,7 +22,7 @@ class TravisApi(object):
       Get account information.
       https://docs.travis-ci.com/api#accounts
     """
-    return self._request(self._resource('accounts'), requests.get)
+    return self._request(self._resource('accounts'), requests.get).json()
 
   def list_builds(self, owner, repo, **params):
     """
@@ -41,10 +41,10 @@ class TravisApi(object):
       return get_with_params
 
     url = self._resource('repos/{}/{}/builds'.format(owner, repo))
-    builds = self._request(url, requests.get, params)['builds']
+    builds = self._request(url, requests.get, params).json()['builds']
     least_number = min([int(bd['number']) for bd in builds])
     while least_number > 1:
-      page = self._request(url, make_func(least_number), params)['builds']
+      page = self._request(url, make_func(least_number), params).json()['builds']
       builds.extend(page)
       least_number = min([int(bd['number']) for bd in page])
     return builds
@@ -58,7 +58,7 @@ class TravisApi(object):
         - build_id: the id of the build
     """
     url = self._resource('builds/{}'.format(build_id))
-    return self._request(url, requests.get)
+    return self._request(url, requests.get).json()
 
   def get_log(self, job_id):
     """
@@ -69,7 +69,7 @@ class TravisApi(object):
         - job_id: the id of the job
     """
     url = self._resource('jobs/{}/log'.format(job_id))
-    return self._request(url, requests.get)
+    return self._request(url, requests.get, {'media':'text/plain'}).text
 
   def _add_headers(self, params={}):
     media = params.pop('media', 'application/vnd.travis-ci.2+json')
@@ -86,7 +86,7 @@ class TravisApi(object):
 
   def _request(self, url, method, params={}):
     resp = method(url, headers=self._add_headers(params))
-    return resp.json()
+    return resp
 
   def _resource(self, resource):
     return self.API_BASE + resource
@@ -99,7 +99,7 @@ def main():
   builds = client.list_builds('DrakeW', 'projectscope')
   print(len(builds))
   print(client.show_build(builds[0]['id']))
-  print(list(client.get_log(builds[0]['job_ids'][0]).keys()))
+  print(client.get_log('169196417'))
 
 if __name__ == '__main__':
   main()

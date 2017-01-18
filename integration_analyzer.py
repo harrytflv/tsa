@@ -133,6 +133,48 @@ class IntegrationAnalyzer(object):
             'cucumber_passed':cucumber_passed,
             'cucumber_coverage':cucumber_coverage}
 
+  def trend_reload(self):
+    with open('cache/trend_data.json', 'r') as f_in:
+      trend_data = json.load(f_in)
+    def filter_data(input_lst):
+      return list(filter(lambda x: x != -1, input_lst))
+
+    for proj in self.project_info:
+      proj_info = trend_data[proj['ID']]
+      c_total = np.array(filter_data(proj_info['cucumber_total']))
+      c_passed = np.array(filter_data(proj_info['cucumber_passed']))
+      c_coverage = np.array(filter_data(proj_info['cucumber_coverage']))
+
+      r_total = np.array(filter_data(proj_info['rspec_total']))
+      r_passed = np.array(filter_data(proj_info['rspec_passed']))
+      r_coverage = np.array(filter_data(proj_info['rspec_coverage']))
+
+      fig, ax1 = plt.subplots()
+      ax1.plot(100.0*c_passed/c_total, marker='d', label='Percent Passed')
+      ax1.plot(c_coverage, marker='o', label='Coverage')
+      ax1.set_ylabel('Percentage')
+      ax1.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
+      ax2 = ax1.twinx()
+      ax2.plot(c_total, '-sr', label='Test Cases')
+      ax2.set_ylabel('Number of test cases')
+      ax2.legend()
+      plt.savefig('{}/cucumber_{}.png'.format(self.out_header, proj['ID']))
+      plt.close(fig)
+
+      fig, ax1 = plt.subplots()
+      ax1.plot(100.0*r_passed/r_total, marker='d', label='Percent Passed')
+      ax1.plot(r_coverage, marker='o', label='Coverage')
+      ax1.set_ylabel('Percentage')
+      ax1.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
+      ax2 = ax1.twinx()
+      ax2.plot(r_total, '-sr', label='Test Cases')
+      ax2.set_ylabel('Number of test cases')
+      ax2.legend()
+      plt.savefig('{}/rspec_{}.png'.format(self.out_header, proj['ID']))
+      plt.close(fig)
+
   def _analyze_log(self, log_in):
     ansi_escape = re.compile(r'\x1b[^m]*m')
     text = ansi_escape.sub('', log_in)
@@ -189,13 +231,14 @@ def main():
     tokens = json.load(f_in)
   analyzer = IntegrationAnalyzer(tokens, project_info)
   # print(len(analyzer.builds(project_info[0])))
-  data_cache = {}
-  for proj in project_info:
-    print('Processing Project {}'.format(proj['ID']))
-    data = analyzer.trend(proj)
-    data_cache[proj['ID']] = data
-  with open('cache/trend_data.json', 'w') as f_out:
-    json.dump(data_cache, f_out)
+  # data_cache = {}
+  # for proj in project_info:
+  #   print('Processing Project {}'.format(proj['ID']))
+  #   data = analyzer.trend(proj)
+  #   data_cache[proj['ID']] = data
+  # with open('cache/trend_data.json', 'w') as f_out:
+  #  json.dump(data_cache, f_out)
+  analyzer.trend_reload()
 
 if __name__ == '__main__':
   main()

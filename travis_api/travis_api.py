@@ -99,7 +99,7 @@ def main():
   builds = client.list_builds('DrakeW', 'projectscope')
   print(len(builds))
   print(client.show_build(builds[0]['id']))
-  print(client.get_log('169196417'))
+  print(client.get_log('167532876'))
 
 if __name__ == '__main__':
   main()

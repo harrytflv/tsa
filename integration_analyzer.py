@@ -7,7 +7,6 @@ import pandas as pd
 import json
 import os
 import time
-from tqdm import tqdm
 import re
 from collections import defaultdict
 
@@ -52,18 +51,29 @@ class IntegrationAnalyzer(object):
         json.dump(build_cache, f_out)
       return builds
 
-  def trend(self, proj):
+  def trend(self, proj, reload=True):
+    if reload:
+      with open('cache/log_info.json', 'r') as f_in:
+        data_cache = json.load(f_in)
+      cached_logs = data_cache[proj['ID']]
+
     builds = self.builds(proj)
     builds = list(filter(lambda x: x['started_at'] and x['job_ids'], builds))
     builds = sorted(builds, key=lambda bd: bd['started_at'])
     timestamps, status = [], []
     rspec_total, rspec_passed, rspec_coverage = [], [], []
     cucumber_total, cucumber_passed, cucumber_coverage = [], [], []
-    for bd in tqdm(builds):
+    log_infos = []
+    for index, bd in enumerate(builds):
       log_info = {}
-      for job in bd['job_ids']:
-        log_info.update(self._analyze_log(self.tv_client.get_log(job)))
-      if 'cucumber' in log_info and len(log_info['cucumber'])==3:
+      if reload:
+        log_info = cached_logs[index]
+      else:
+        for job in bd['job_ids']:
+          log_info.update(self._analyze_log(self.tv_client.get_log(job)))
+        log_infos.append(log_info)
+
+      if 'cucumber' in log_info and len(log_info['cucumber'])==4:
         cucumber_total.append(log_info['cucumber']['total'])
         cucumber_passed.append(log_info['cucumber']['passed'])
         cucumber_coverage.append(log_info['cucumber']['coverage'])
@@ -81,47 +91,41 @@ class IntegrationAnalyzer(object):
         rspec_coverage.append(-1)
       timestamps.append(int(time.mktime(time.strptime(bd['started_at'], '%Y-%m-%dT%H:%M:%SZ'))))
       status.append(bd['state'])
-    """
+
+    def filter_data(input_lst):
+      return list(filter(lambda x: x != -1, input_lst))
+    c_total = np.array(filter_data(cucumber_total), dtype='float')
+    c_passed = np.array(filter_data(cucumber_passed), dtype='float')
+    c_coverage = np.array(filter_data(cucumber_coverage), dtype='float')
+
+    r_total = np.array(filter_data(rspec_total), dtype='float')
+    r_passed = np.array(filter_data(rspec_passed), dtype='float')
+    r_coverage = np.array(filter_data(rspec_coverage), dtype='float')
+
     fig, ax1 = plt.subplots()
-    ax1.plot(timestamps, cucumber_total, '-', label='Total')
-    ax1.plot(timestamps, cucumber_passed, '-', label='Passed')
-    ax1.set_ylabel('Number of steps')
-    ax1.legend(loc=1)
+    ax1.plot(100.0*c_passed/c_total, marker='d', label='Percent Passed')
+    ax1.plot(c_coverage, marker='o', label='Coverage')
+    ax1.set_ylabel('Percentage')
+    ax1.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+         ncol=2, mode="expand", borderaxespad=0.)
     ax2 = ax1.twinx()
-    ax2.plot(timestamps, cucumber_coverage, '-r', label='Coverage')
-    ax2.set_ylabel('Percentage')
-    ax2.legend(loc=0)
-    plt.savefig('{}/cucumber.png'.format(self.out_header))
+    ax2.plot(c_total, '-sr', label='Test Cases')
+    ax2.set_ylabel('Number of test cases')
+    ax2.legend()
+    plt.savefig('{}/cucumber_{}.png'.format(self.out_header, proj['ID']))
     plt.close(fig)
 
     fig, ax1 = plt.subplots()
-    ax1.plot(timestamps, rspec_total, '-', label='Total')
-    ax1.plot(timestamps, rspec_passed, '-', label='Passed')
-    ax1.set_ylabel('Number of examples')
-    ax1.legend(loc=1)
+    ax1.plot(100.0*r_passed/r_total, marker='d', label='Percent Passed')
+    ax1.plot(r_coverage, marker='o', label='Coverage')
+    ax1.set_ylabel('Percentage')
+    ax1.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+         ncol=2, mode="expand", borderaxespad=0.)
     ax2 = ax1.twinx()
-    ax2.plot(timestamps, rspec_coverage, '-r', label='Coverage')
-    ax2.set_ylabel('Percentage')
-    ax2.legend(loc=0)
-    plt.savefig('{}/rspec.png'.format(self.out_header))
-    plt.close(fig)
-    """
-    percent_passed = np.array(list(filter(lambda x: x != -1, cucumber_passed))) / np.array(list(filter(lambda x: x != -1, cucumber_total)))
-    fig, ax = plt.subplots()
-    plt.plot(100.0*percent_passed, marker='d', label='Percent Passed')
-    plt.plot(list(filter(lambda x: x != -1, cucumber_coverage)), marker='o', label='Coverage')
-    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-           ncol=2, mode="expand", borderaxespad=0.)
-    plt.savefig('{}/{}_cucumber.png'.format(self.out_header, proj['ID']))
-    plt.close(fig)
-
-    percent_passed = np.array(list(filter(lambda x: x != -1, rspec_passed))) / np.array(list(filter(lambda x: x != -1, rspec_total)))
-    fig, ax = plt.subplots()
-    plt.plot(100.0*percent_passed, marker='d', label='Percent Passed')
-    plt.plot(list(filter(lambda x: x != -1, rspec_coverage)), marker='o', label='Coverage')
-    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-           ncol=2, mode="expand", borderaxespad=0.)
-    plt.savefig('{}/{}_spec.png'.format(self.out_header, proj['ID']))
+    ax2.plot(r_total, '-sr', label='Test Cases')
+    ax2.set_ylabel('Number of test cases')
+    ax2.legend()
+    plt.savefig('{}/rspec_{}.png'.format(self.out_header, proj['ID']))
     plt.close(fig)
 
     return {'timstamp':timestamps,
@@ -131,7 +135,8 @@ class IntegrationAnalyzer(object):
             'rspec_coverage':rspec_coverage,
             'cucumber_total':cucumber_total,
             'cucumber_passed':cucumber_passed,
-            'cucumber_coverage':cucumber_coverage}
+            'cucumber_coverage':cucumber_coverage,
+            'log_info':log_infos}
 
   def trend_reload(self):
     with open('cache/trend_data.json', 'r') as f_in:
@@ -141,13 +146,13 @@ class IntegrationAnalyzer(object):
 
     for proj in self.project_info:
       proj_info = trend_data[proj['ID']]
-      c_total = np.array(filter_data(proj_info['cucumber_total']))
-      c_passed = np.array(filter_data(proj_info['cucumber_passed']))
-      c_coverage = np.array(filter_data(proj_info['cucumber_coverage']))
+      c_total = np.array(filter_data(proj_info['cucumber_total']), dtype='float')
+      c_passed = np.array(filter_data(proj_info['cucumber_passed']), dtype='float')
+      c_coverage = np.array(filter_data(proj_info['cucumber_coverage']), dtype='float')
 
-      r_total = np.array(filter_data(proj_info['rspec_total']))
-      r_passed = np.array(filter_data(proj_info['rspec_passed']))
-      r_coverage = np.array(filter_data(proj_info['rspec_coverage']))
+      r_total = np.array(filter_data(proj_info['rspec_total']), dtype='float')
+      r_passed = np.array(filter_data(proj_info['rspec_passed']), dtype='float')
+      r_coverage = np.array(filter_data(proj_info['rspec_coverage']), dtype='float')
 
       fig, ax1 = plt.subplots()
       ax1.plot(100.0*c_passed/c_total, marker='d', label='Percent Passed')
@@ -175,54 +180,99 @@ class IntegrationAnalyzer(object):
       plt.savefig('{}/rspec_{}.png'.format(self.out_header, proj['ID']))
       plt.close(fig)
 
+  def test_analyze_log(self, proj):
+    """
+      This function is used to test the log analysis.
+    """
+    builds = self.builds(proj)
+    builds = list(filter(lambda x: x['started_at'] and x['job_ids'], builds))
+    builds = sorted(builds, key=lambda bd: bd['started_at'])
+    for bd in tqdm(builds):
+      log_info = {}
+      for job in bd['job_ids']:
+        log_info.update(self._analyze_log(self.tv_client.get_log(job)))
+      print(log_info)
+
   def _analyze_log(self, log_in):
-    ansi_escape = re.compile(r'\x1b[^m]*m')
+    ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
+    escape_list = re.compile(r'[\(\),]')
     text = ansi_escape.sub('', log_in)
+    # with open('{}/tmp/logs.txt'.format(self.out_header), 'a') as f_out:
+    #   f_out.write(text)
     log_info = defaultdict(lambda: {})
     lines = iter(text.splitlines())
+    tmp_feature = None
+    log_info['cucumber']['scenarios'] = []
     try:
       while True:
         line = next(lines)
+        # if line == '$ bundle exec cucumber':
+        #   log_info['cucumber'] = self._cucumber_info(lines)
+        # if line == '$ bundle exec rake spec':
+        #   log_info['rspec'] = self._rspec_info(lines)
+        line = escape_list.sub('', line)
         info_list = line.split(' ')
-        if len(info_list) < 3:
-          continue
-        if info_list[1] == 'steps':
-          log_info['cucumber']['total'] = int(info_list[0])
-          log_info['cucumber']['passed'] = int(info_list[2][1:])
-        if info_list[0] == 'Coverage' and 'Cucumber' in info_list:
-          log_info['cucumber']['coverage'] = float(info_list[-2][1:-2])
-        if info_list[1] == 'examples,':
-          log_info['rspec']['total'] = int(info_list[0])
-          log_info['rspec']['passed'] = int(info_list[2])
-        if info_list[0] == 'Coverage' and info_list[1] == '=':
-          log_info['rspec']['coverage'] = float(info_list[2][:-2])
+        if 'Feature:' in line:
+          tmp_feature = line
+        if 'Scenario:' in line:
+          log_info['cucumber']['scenarios'].append({'feature':tmp_feature, 'scenario':line})
+        if 'scenarios' in info_list and 'passed' in info_list:
+          log_info['cucumber']['total'] = int(info_list[info_list.index('scenarios')-1])
+          log_info['cucumber']['passed'] = int(info_list[info_list.index('passed')-1])
+        if 'Coverage report generated for Cucumber Features' in line:
+          log_info['cucumber']['coverage'] = float(info_list[info_list.index('LOC')+1][:-1])
+        if 'examples' in info_list and 'failures' in info_list:
+          log_info['rspec']['total'] = int(info_list[info_list.index('examples')-1])
+          log_info['rspec']['passed'] = log_info['rspec']['total'] - int(info_list[info_list.index('failures')-1])
+        if 'Coverage =' in line:
+          log_info['rspec']['coverage'] = float(info_list[info_list.index('=')+1][:-2])
     except StopIteration:
       return log_info
     return log_info
 
   def _cucumber_info(self, lines):
-    log_info = {}
+    log_info = {'scenarios':[]}
+    escape_list = re.compile(r'[\(\),]')
+    tmp_feature = None
     while True:
       line = next(lines)
-      if '$' in line:
+      if len(line) < 1:
+        continue
+      if '$' == line[0]:
         return log_info
+      line = escape_list.sub('', line)
       info_list = line.split(' ')
-      if 'steps' in info_list and 'passed' in info_list:
-        log_info['cucumber_total'] = int(info_list[0])
-        log_info['cucumber_passed'] = int(info_list[2])
+      if 'Feature:' in line:
+        tmp_feature = line
+      if 'Scenario:' in line:
+        log_info['scenarios'].append({'feature':tmp_feature, 'scenario':line})
+      if 'scenarios' in info_list and 'passed' in info_list:
+        log_info['total'] = int(info_list[info_list.index('scenarios')-1])
+        log_info['passed'] = int(info_list[info_list.index('passed')-1])
+      if 'Coverage report generated for Cucumber Features' in line:
+        log_info['coverage'] = float(info_list[info_list.index('LOC')+1][:-1])
+      if 'The command \"bundle exec cucumber\" exited with' in line:
         return log_info
     return log_info
 
   def _rspec_info(self, lines):
     log_info = {}
+    escape_list = re.compile(r'[\(\),]')
     while True:
       line = next(lines)
-      if '$' in line:
+      if len(line) < 1:
+        continue
+      if '$' == line[0]:
         return log_info
+      line = escape_list.sub('', line)
       info_list = line.split(' ')
-      if 'examples,' in info_list:
-        log_info['cucumber_total'] = int(info_list[0])
-        log_info['cucumber_passed'] = int(info_list[2])
+      if 'examples' in info_list and 'failures' in info_list:
+        log_info['total'] = int(info_list[info_list.index('examples')-1])
+        log_info['passed'] = log_info['total'] - int(info_list[info_list.index('failures')-1])
+      if 'Coverage =' in line:
+        log_info['coverage'] = float(info_list[info_list.index('=')+1][:-2])
+      if 'The command \"bundle exec rake spec\" exited with' in line:
+        return log_info
     return log_info
 
 def main():
@@ -231,14 +281,15 @@ def main():
     tokens = json.load(f_in)
   analyzer = IntegrationAnalyzer(tokens, project_info)
   # print(len(analyzer.builds(project_info[0])))
-  # data_cache = {}
-  # for proj in project_info:
-  #   print('Processing Project {}'.format(proj['ID']))
-  #   data = analyzer.trend(proj)
-  #   data_cache[proj['ID']] = data
-  # with open('cache/trend_data.json', 'w') as f_out:
-  #  json.dump(data_cache, f_out)
-  analyzer.trend_reload()
+  data_cache = {}
+  for proj in project_info:
+    print('Processing Project {}'.format(proj['ID']))
+    data = analyzer.trend(proj)
+    data_cache[proj['ID']] = data
+  with open('cache/trend_data.json', 'w') as f_out:
+    json.dump(data_cache, f_out)
+  # analyzer.trend_reload()
+  # analyzer.test_analyze_log(project_info[0])
 
 if __name__ == '__main__':
   main()

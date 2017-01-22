@@ -9,6 +9,7 @@ import os
 import time
 import re
 from collections import defaultdict
+from tqdm import tqdm
 
 from data_util.data_reader import ProjectInfo
 from travis_api.travis_api import TravisApi
@@ -64,7 +65,9 @@ class IntegrationAnalyzer(object):
     rspec_total, rspec_passed, rspec_coverage = [], [], []
     cucumber_total, cucumber_passed, cucumber_coverage = [], [], []
     log_infos = []
-    for index, bd in enumerate(builds):
+    index = -1
+    for bd in tqdm(builds):
+      index += 1
       log_info = {}
       if reload:
         log_info = cached_logs[index]
@@ -213,7 +216,11 @@ class IntegrationAnalyzer(object):
         line = escape_list.sub('', line)
         info_list = line.split(' ')
         if 'Feature:' in line:
-          tmp_feature = line
+          tmp_feature = line[9:]
+          line = next(lines)
+          while not 'Scenario:' in line and not 'Background:' in line and len(line) > 1:
+            tmp_feature += '\n' + line
+            line = next(lines)
         if 'Scenario:' in line:
           log_info['cucumber']['scenarios'].append({'feature':tmp_feature, 'scenario':line})
         if 'scenarios' in info_list and 'passed' in info_list:
@@ -281,13 +288,27 @@ def main():
     tokens = json.load(f_in)
   analyzer = IntegrationAnalyzer(tokens, project_info)
   # print(len(analyzer.builds(project_info[0])))
-  data_cache = {}
-  for proj in project_info:
-    print('Processing Project {}'.format(proj['ID']))
-    data = analyzer.trend(proj)
-    data_cache[proj['ID']] = data
-  with open('cache/trend_data.json', 'w') as f_out:
-    json.dump(data_cache, f_out)
+  data_cache, log_info = {}, {}
+  if 'trend_data.json' in os.listdir('cache'):
+    with open('cache/trend_data.json', 'r') as f_in:
+      data_cache = json.load(f_in)
+  if 'log_info.json' in os.listdir('cache'):
+    with open('cache/log_info.json', 'r') as f_in:
+      log_info = json.load(f_in)
+  try:
+    for proj in project_info:
+      if proj['ID'] in data_cache and proj['ID'] in log_info:
+        print('Skip Project {}'.format(proj['ID']))
+        continue
+      print('Processing Project {}'.format(proj['ID']))
+      data = analyzer.trend(proj, reload=False)
+      data_cache[proj['ID']] = data
+      log_info[proj['ID']] = data['log_info']
+  finally:
+    with open('cache/trend_data.json', 'w') as f_out:
+      json.dump(data_cache, f_out)
+    with open('cache/log_info.json', 'w') as f_out:
+      json.dump(log_info, f_out)
   # analyzer.trend_reload()
   # analyzer.test_analyze_log(project_info[0])
 

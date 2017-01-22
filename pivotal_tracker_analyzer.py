@@ -26,6 +26,12 @@ class PivotalTrackerAnalyzer(object):
     super(PivotalTrackerAnalyzer, self).__init__()
     self.project_info = project_info
     self.client = TrackerApi(token)
+
+  def stories(self, proj):
+    """
+      Get all stories for a project
+    """
+    return self.client.get_stories(proj['tracker'])
   
   def story_assign(self, reload=False):
     '''

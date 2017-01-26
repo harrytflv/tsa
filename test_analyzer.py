@@ -58,8 +58,8 @@ class TestAnalyzer(object):
     from sklearn.feature_extraction.text import CountVectorizer
 
     vectorizer = CountVectorizer()
-    total_feature = list(total_features)
-    word_corps = total_feature + story_str
+    total_features = list(total_features)
+    word_corps = total_features + story_str
     flags = ['cucumber']*len(total_features) + ['stories']*len(story_str)
 
     plotdata = pd.DataFrame({'length':[len(txt) for txt in word_corps], 'flag':flags})
@@ -74,28 +74,85 @@ class TestAnalyzer(object):
     transformer = TfidfTransformer(smooth_idf=False)
     tfidf = transformer.fit_transform(word_vecs)
 
-    cucumber_vec_txt = list(zip(tfidf[:len(total_features)], total_feature))
-    story_vec_txt = list(zip(tfidf[len(total_features):], story_str))
-    best_match = []
+    cucumber_vec_txt = list(zip(tfidf[:len(total_features)], total_features))
+    story_vec_txt = list(zip(tfidf[len(total_features):], stories))
+    best_match = {}
     for vec_txt in cucumber_vec_txt:
       story = self._nearest_neighbor(vec_txt, story_vec_txt)
-      best_match.append((vec_txt[1], story[1]))
+      best_match[vec_txt[1]] = story[1]
 
-    with open('{}/match_results.txt'.format(self.out_header), 'a') as f_out:
-      for cucumber_txt, story_txt in best_match:
-        f_out.write(cucumber_txt)
-        f_out.write('\n---------------\n')
-        f_out.write(story_txt)
-        f_out.write('\n\n\n')
+    with open('cache/cucumber_story_match/{}_match_results.json'.format(proj['ID']), 'w') as f_out:
+      json.dump(best_match, f_out, sort_keys=True, indent=4, separators=(',', ': '))
 
-    from sklearn.manifold import TSNE
-    model = TSNE(n_components=2, random_state=0)
-    plot_points = model.fit_transform(tfidf.toarray())
+    # from sklearn.manifold import TSNE
+    # model = TSNE(n_components=2, random_state=0)
+    # plot_points = model.fit_transform(tfidf.toarray())
 
+    # fig, ax = plt.subplots()
+    # plt.scatter([x[0] for x in plot_points], [x[1] for x in plot_points], c=['g' if x == 'cucumber' else 'b' for x in flags], alpha=0.5)
+    # plt.savefig('{}/{}_scatter.png'.format(self.out_header, proj['ID']))
+    # plt.close(fig)
+
+  def lifecycle(self, proj):
+    """
+      Plot the first appearance of a test case within the lifecycle of corresponding user story.
+      Assume a cache file exists.
+
+      Input
+        - proj: a given project
+    """
+    bd_history = self.build_info[proj['ID']]
+    features, scenarios = [], []
+    # total_features, total_scenarios = set(), set()
+    for bd in bd_history:
+      tmp_feature, tmp_scenarios = set(), set()
+      for scenario in bd['cucumber']['scenarios']:
+        feature = self._extract_feature(scenario['feature'])
+        scenario = self._extract_scenario(scenario['scenario'])
+        if feature and scenario:
+          tmp_feature.add(feature)
+          tmp_scenarios.add(scenario)
+          # total_features.add(feature)
+          # total_scenarios.add(scenario)
+      features.append(tmp_feature)
+      scenarios.append(tmp_scenarios)
+
+    with open('cache/cucumber_story_match/{}_match_results.json'.format(proj['ID']), 'r') as f_in:
+      story_match = json.load(f_in)
+
+    owner, repo = proj['repo']['owner'], proj['repo']['repo']
+    key = '{}|{}'.format(owner, repo)
+    with open('cache/builds.json', 'r') as f_in:
+      build_cache = json.load(f_in)
+    builds = build_cache[key]
+
+    prev_feature = set()
+    lifecycle_info = []
+    for feature, bd in zip(features, builds):
+      for f in feature - prev_feature:
+        lifecycle_info.append(self._compare(f, bd, story_match[f], proj['tracker']))
+      prev_feature.update(feature)
+
+    time_span_data = []
+    for t_test, t_story in lifecycle_info:
+      if 'created' in t_story and 'updated' in t_story:
+        t_0 = time.mktime(time.strptime(t_test, '%Y-%m-%dT%H:%M:%SZ'))
+        t_1 = time.mktime(time.strptime(t_story['created'], '%Y-%m-%dT%H:%M:%SZ'))
+        t_2 = time.mktime(time.strptime(t_story['updated'], '%Y-%m-%dT%H:%M:%SZ'))
+        time_span_data.append(float(t_0-t_1)/float(t_2-t_1+0.1))
+
+    time_span_data = list(filter(lambda x: abs(x) < 1.5, time_span_data))
     fig, ax = plt.subplots()
-    plt.scatter([x[0] for x in plot_points], [x[1] for x in plot_points], c=['g' if x == 'cucumber' else 'b' for x in flags], alpha=0.5)
-    plt.savefig('{}/{}_scatter.png'.format(self.out_header, proj['ID']))
+    plt.hist(time_span_data, 20)
+    plt.savefig('{}/{}_span.png'.format(self.out_header, proj['ID']))
     plt.close(fig)
+
+  def _compare(self, feature_str, bd, story, proj_id):
+    story_transitions = self.pt_client.get_story_transitions(proj_id, story['id'])
+    transition_time = {item['state']:item['occurred_at'] for item in story_transitions}
+    transition_time['created'] = story['created_at']
+    transition_time['updated'] = story['updated_at']
+    return bd['started_at'], transition_time
 
   def _nearest_neighbor(self, pnt, candidate_list):
     choice = list(sorted(candidate_list, key=lambda x: self._distance(x, pnt)))[0]
@@ -145,7 +202,9 @@ def main():
     tokens = json.load(f_in)
   analyzer = TestAnalyzer(tokens, project_info)
   for proj in tqdm(project_info):
-    analyzer.cucumber_scenarios(proj)
+    # analyzer.cucumber_scenarios(proj)
+    analyzer.lifecycle(proj)
+  # analyzer.lifecycle(project_info[0])
 
 if __name__ == '__main__':
   main()

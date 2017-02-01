@@ -3,7 +3,7 @@
 import urllib.request
 import json
 
-class TrackerApi:
+class TrackerApi(object):
 	"""
 		Wrapper for PivotalTracker API
 
@@ -51,7 +51,7 @@ class TrackerApi:
 				- project_id: Project ID
 			Output
 				- a list of json objects, each object is a story
-		"""		
+		"""
 		url = self._resource('projects/{}/stories'.format(project_id))
 		return self._request(url)
 

@@ -16,6 +16,7 @@ from data_util.data_reader import ProjectInfo
 from data_util.data_reader import IterationGrading
 from pivotal_tracker_api.tracker_api import TrackerApi
 from metrics.metric_tracker import MetricTracker
+from metrics.metric_github import MetricGithub
 
 class MetricComparisonAnalyzer(object):
   """
@@ -31,12 +32,12 @@ class MetricComparisonAnalyzer(object):
       os.mkdir('results/{}'.format(self.out_header))
     self.out_header = 'results/{}'.format(self.out_header)
     self.ROOT_PATH = '/Users/Joe/Projects/TeamScope/analysis'
-    self.metric_list = [MetricTracker,]
+    self.metric_list = [MetricTracker, MetricGithub]
 
   def get_grades(self, proj):
     pid = proj['ID']
     grades = defaultdict(lambda: defaultdict(lambda: 0))
-    self.grade_names = ['tracker', 'total', 'codeclimate', 'coverage', 'customer']
+    self.grade_names = ['tracker', 'codeclimate', 'coverage', 'customer', 'total']
     for item in self.iteration_grading:
       if item['Team ID'] != pid:
         continue
@@ -56,12 +57,13 @@ class MetricComparisonAnalyzer(object):
 
     features, labels, values = [], [], []
     for i in range(4):
-      for item in data:
-        features.append(item[i+1])
+      tmp_feature = []
       values.append(grad[i+1])
-
-    for item in data_name:
-      labels.extend(item)
+      for item in data:
+        tmp_feature.extend(item[i+1])
+      features.append(tmp_feature)
+    for label in data_name:
+      labels.extend(label)
     self.metric_labels = labels
     return features, values
 

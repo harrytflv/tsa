@@ -157,15 +157,15 @@ class MetricTracker(BasicMetric):
     return result
 
   def metric_name(self):
-    return ['average velocity', 'average review time', 'correlation']
+    return ['Velocity', 'Review Time', 'Correlation']
 
   def _extract(self, pt_info):
     import math
-    from scipy.stats import spearmanr
+    from scipy.stats import pearsonr
     velocity = np.sum(pt_info['velocity'])
     avg_reveiw_time = np.average([np.log(x+1) for x in pt_info['review']]) if len(pt_info['review']) > 0 else None
     avg_customer_timer = np.average(pt_info['customer']) if len(pt_info['customer']) > 0 else None
-    r = spearmanr([x[1] for x in pt_info['time']], [x[0] for x in pt_info['time']])[0]
+    r = pearsonr([x[1] for x in pt_info['time']], [x[0] for x in pt_info['time']])[0]
     r = r if not math.isnan(r) else None
     return [velocity, avg_reveiw_time, r]
 

@@ -85,6 +85,43 @@ class GithubApi(object):
     page, _ = self._request(url, requests.get)
     return page
 
+  def get_pull_requests(self, owner, repo, **params):
+    """
+      Get all pull requests for a given repository.
+      https://developer.github.com/v3/pulls/#list-pull-requests
+
+      Input
+        - owner, repo: used for locating the repository
+        - params: other parameters, parameters will be included as headers
+      Output
+        - pages: a list of json objects (dictionaries), each dictionary is a commit.
+      Note:
+        Github divides results into pages, so this single function call may include several API calls
+        see https://developer.github.com/guides/traversing-with-pagination/
+    """
+    url = self._resource('/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo))
+    pages, links = self._request(url, requests.get, params)
+    while 'next' in links:
+      url = links['next']['url']
+      page, links = self._request(url, requests.get, params)
+      pages.extend(page)
+    return pages
+
+  def get_pull_request(self, owner, repo, number):
+    """
+      Get a single pull request
+      https://developer.github.com/v3/pulls/#get-a-single-pull-request
+
+      Input
+        - owner, repo: used for locating the repo
+        - number: pull request number used to specify the PR
+      Output
+        - a json object
+    """
+    url = self._resource('/repos/{owner}/{repo}/pulls/{number}'.format(owner=owner, repo=repo, number=number))
+    page, _ = self._request(url, requests.get)
+    return page
+
   def _add_headers(self, params={}):
     media = params.pop('media', 'application/vnd.github.v3+json')
     header = {
@@ -102,11 +139,11 @@ class GithubApi(object):
     return self.API_BASE + resource
 
 def main():
-  with open('../conf/tokens.json', 'r') as f_in:
+  with open('conf/tokens.json', 'r') as f_in:
     token = json.load(f_in)
   client = GithubApi(token['github']['token'])
   resp = client.get_commits('an-ju', 'projectscope')
-  contributes = client.get_contributes('an-ju', 'projectscope')
+  client.get_pull_requests('an-ju', 'projectscope')
 
 if __name__ == '__main__':
   main()

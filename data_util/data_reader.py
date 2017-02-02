@@ -92,18 +92,57 @@ class ProjectInfo(Dataset):
       'repo': info_lst[index+2]
     }
 
+class IterationGrading(Dataset):
+  def _preload(self):
+    if self.data_name == 'cumulative':
+      with open(self.data_file, 'r') as f_in:
+        csv_reader = csv.DictReader(f_in)
+        for row in csv_reader:
+          self.append(row)
+    else:
+      for ite in range(4):
+        for phase in range(2):
+          f_name = '{}{}'.format(self.data_file, self.iter_filename((ite+1, phase+1)))
+          with open(f_name, 'r') as f_in:
+            csv_reader = csv.DictReader(f_in)
+            for row in csv_reader:
+              row['iteration'] = ite + 1
+              row['phase'] = phase + 1
+              self.append(row)
+
+  def iter_filename(self, ite):
+    return {
+      (1, 1): 'Grading Sheet - Iter1-1 (CURR).csv',
+      (1, 2): 'Grading Sheet - Iter1-2.csv',
+      (2, 1): 'Grading Sheet - Iter2-1.csv',
+      (2, 2): 'Grading Sheet - Iter2-2.csv',
+      (3, 1): 'Grading Sheet - Iter3-1.csv',
+      (3, 2): 'Grading Sheet - Iter3-2.csv',
+      (4, 1): 'Grading Sheet - Iter4-1.csv',
+      (4, 2): 'Grading Sheet - Iter4-2.csv',
+    }[ite]
+
 def main():
-  dataset = PeerReview('../data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')
+  dataset = PeerReview('data/Peer Evaluation (Responses) - Iter1.csv', 'peer_single')
   dataset.print_metadata()
   dataset.print_examples()
 
-  dataset = PeerReview('../data/', 'peer_combined')
+  dataset = PeerReview('data/', 'peer_combined')
   dataset.print_metadata()
   dataset.print_examples()
 
-  dataset = ProjectInfo('../data/CS 169 F16 Projects - Sheet1.csv', 'project-info')
+  dataset = ProjectInfo('data/CS 169 F16 Projects - Sheet1.csv', 'project-info')
   dataset.print_metadata()
   dataset.print_examples()
+
+  dataset = IterationGrading('data/Grading Sheet - Cumulative Grading.csv', 'cumulative')
+  dataset.print_metadata()
+  dataset.print_examples()
+
+  dataset = IterationGrading('data/', 'detailed')
+  dataset.print_metadata()
+  dataset.print_examples()
+
 
 if __name__ == '__main__':
   main()

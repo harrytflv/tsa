@@ -99,7 +99,7 @@ class GithubApi(object):
         Github divides results into pages, so this single function call may include several API calls
         see https://developer.github.com/guides/traversing-with-pagination/
     """
-    url = self._resource('/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo))
+    url = self._resource('/repos/{owner}/{repo}/pulls?state=all'.format(owner=owner, repo=repo))
     pages, links = self._request(url, requests.get, params)
     while 'next' in links:
       url = links['next']['url']

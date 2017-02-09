@@ -32,7 +32,7 @@ class MetricComparisonAnalyzer(object):
       os.mkdir('results/{}'.format(self.out_header))
     self.out_header = 'results/{}'.format(self.out_header)
     self.ROOT_PATH = '/Users/Joe/Projects/TeamScope/analysis'
-    self.metric_list = [MetricTracker, MetricGithub]
+    self.metric_list = [MetricTracker]
 
   def get_grades(self, proj):
     pid = proj['ID']
@@ -88,6 +88,7 @@ class MetricComparisonAnalyzer(object):
     fig, ax = plt.subplots()
     sns.heatmap(corr, annot=True, linewidths=.5)
     plt.savefig('{}/corr_heatmap.png'.format(self.out_header))
+    plt.yticks(rotation=0) 
     plt.close(fig)
 
 def main():

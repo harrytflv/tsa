@@ -23,7 +23,7 @@ class MetricGithub(BasicMetric):
     if not self.out_header in os.listdir(self.ROOT_PATH+'/results'):
       os.mkdir('{}/results/{}'.format(self.ROOT_PATH, self.out_header))
     self.out_header = '{}/results/{}'.format(self.ROOT_PATH, self.out_header)
-    self.projsha_commit = {}
+    self.projsha_commit, self.projsha_pr = {}, {}
 
   def _load_connection(self):
     self.client = GithubApi(self.tokens['github']['token'])
@@ -45,7 +45,7 @@ class MetricGithub(BasicMetric):
       iteration_data[nite]['num_files'].append(len(cmit_info['files']))
       iteration_data[nite]['comments'].append(cmit_info['commit']['message'])
     for pr in pull_requests:
-      if pr['state'] in ['open', 'closed']:
+      if not pr['merged_at']:
         continue
       ctime = time.mktime(time.strptime(pr['created_at'], '%Y-%m-%dT%H:%M:%SZ'))
       mtime = time.mktime(time.strptime(pr['merged_at'], '%Y-%m-%dT%H:%M:%SZ'))
@@ -69,7 +69,7 @@ class MetricGithub(BasicMetric):
   def _extract(self, info):
     total_num_files = np.sum(info['num_files'])
     avg_msg_length = np.average([len(nltk.word_tokenize(x)) for x in info['comments']])
-    avg_review_time = np.average(info['review_time']) if len(info['review_time']) > 0 else None
+    avg_review_time = np.average([np.log(x+1) for x in info['review_time']]) if len(info['review_time']) > 0 else None
     avg_num_comments = np.average(info['pr_comments']) if len(info['pr_comments']) > 0 else None
     return [total_num_files, avg_msg_length, avg_review_time, avg_num_comments]
 
@@ -109,13 +109,41 @@ class MetricGithub(BasicMetric):
       json.dump(self.projsha_commit, f_out, sort_keys=True, indent=4, separators=(',', ': '))
     return commit
 
-  def _pull_requests(self):
+  def _pull_requests(self, reload=True):
+    proj_requests = {}
+    if 'proj2prs.json' in os.listdir('{}/cache/'.format(self.ROOT_PATH)):
+      with open('{}/cache/proj2prs.json'.format(self.ROOT_PATH), 'r') as f_in:
+        proj_requests = json.load(f_in)
+      if reload and self.proj['ID'] in proj_requests:
+        return proj_requests[self.proj['ID']]
     owner, repo = self.proj['repo']['owner'], self.proj['repo']['repo']
-    return self.client.get_pull_requests(owner, repo)
+    prs = self.client.get_pull_requests(owner, repo)
+    proj_requests[self.proj['ID']] = prs
+    with open('{}/cache/proj2prs.json'.format(self.ROOT_PATH), 'w') as f_out:
+      json.dump(proj_requests, f_out, sort_keys=True, indent=4, separators=(',', ': '))
+    return prs
 
-  def _get_pull_request(self, number):
+  def _get_pull_request(self, number, reload=True):
+    dict_key = '{}:{}'.format(self.proj['ID'], number)
+    if dict_key in self.projsha_pr:
+      return self.projsha_pr[dict_key]
+    if 'projsha2pr.json' in os.listdir('{}/cache/'.format(self.ROOT_PATH)):
+      with open('{}/cache/projsha2pr.json'.format(self.ROOT_PATH), 'r') as f_in:
+        self.projsha_pr = json.load(f_in)
+      if reload and dict_key in self.projsha_pr:
+        return self.projsha_pr[dict_key]
     owner, repo = self.proj['repo']['owner'], self.proj['repo']['repo']
-    return self.client.get_pull_request(owner, repo, number)
+    pr = self.client.get_pull_request(owner, repo, number)
+    multiplier, sleep_time = 2, 1
+    while 'message' in pr:
+      print(pr['message'])
+      time.sleep(sleep_time)
+      pr = self.client.get_pull_request(owner, repo, number)
+      sleep_time *= multiplier
+    self.projsha_pr[dict_key] = pr
+    with open('{}/cache/projsha2pr.json'.format(self.ROOT_PATH), 'w') as f_out:
+      json.dump(self.projsha_pr, f_out, sort_keys=True, indent=4, separators=(',', ': '))
+    return pr
 
   def dump(self):
     if 'projsha2commit.json' in os.listdir('{}/cache/'.format(self.ROOT_PATH)):

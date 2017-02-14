@@ -37,6 +37,22 @@ class GithubApi(object):
       pages.extend(page)
     return pages
 
+  def get_commits_no_page(self, owner, repo, **params):
+    """
+      Get git commits for a given repository without auto pagination.
+      https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
+
+      Input
+        - owner, repo: used for locating the repository
+        - params: other parameters, parameters will be included as headers
+      Output
+        - pages: a list of json objects (dictionaries), each dictionary is a commit.
+        - links: contains next page information
+    """
+    url = self._resource('/repos/{owner}/{repo}/commits'.format(owner=owner, repo=repo))
+    return self._request(url, requests.get, params)
+
+
   def get_commit(self, owner, repo, sha):
     """
       Get a single commit
